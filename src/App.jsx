@@ -10,7 +10,7 @@
 
 import React, { Suspense, lazy, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AppointmentProvider } from "./context/AppointmentContext";
 
 // Immediate components
@@ -37,13 +37,21 @@ const PatientUpcoming = lazy(() => import("./pages/patient/PatientUpcoming"));
 const PatientHistory = lazy(() => import("./pages/patient/PatientHistory"));
 const PatientProfileTab = lazy(() => import("./pages/patient/PatientProfileTab"));
 
+// Inner wrapper: waits for AuthContext to finish loading before mounting AppointmentProvider
+// This prevents the race condition where useAppointments fetches with a null token
+const AppProviderGuard = ({ children }) => {
+  const { isLoading } = useAuth();
+  if (isLoading) return null; // wait for token to be set from localStorage
+  return <AppointmentProvider>{children}</AppointmentProvider>;
+};
+
 export const App = () => {
   const [labModalOpen, setLabModalOpen] = useState(false);
 
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppointmentProvider>
+        <AppProviderGuard>
           <BrowserRouter>
             <div className="app-root-layout">
               {/* Global Header */}
@@ -128,7 +136,7 @@ export const App = () => {
               <StudentBadge isOpen={labModalOpen} onClose={() => setLabModalOpen(false)} />
             </div>
           </BrowserRouter>
-        </AppointmentProvider>
+        </AppProviderGuard>
       </AuthProvider>
     </ErrorBoundary>
   );

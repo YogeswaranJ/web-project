@@ -59,7 +59,7 @@ describe('Experiment 3 (Part e): Doctor Search & Appointment Verification', () =
       const doctor = await api.getDoctorById(doctorId);
       expect(doctor).toBeDefined();
       expect(String(doctor.id)).toBe(String(doctorId));
-      expect(doctor.name).toBe('Dr. Rajesh Sharma');
+      expect(doctor.name).toBe('Dr. Arvind Sharma');
       expect(doctor.specialty).toBe('Cardiology');
     });
   });

@@ -14,6 +14,22 @@ const STORAGE_KEYS = {
 // Helper: Simulate network latency for async/await
 const delay = (ms = 350) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Helper: Styled console logger for API activity
+const logAPI = (method, endpoint, data = null, response = null, isError = false) => {
+  const color = isError ? "#ff4d4f" : method === "GET" ? "#52c41a" : method === "POST" ? "#1890ff" : method === "PUT" ? "#fa8c16" : "#f5222d";
+  const icon = isError ? "❌" : method === "GET" ? "📥" : method === "POST" ? "📤" : method === "PUT" ? "🔄" : "🗑️";
+  console.groupCollapsed(
+    `%c ${icon} ${method} %c ${endpoint} %c ${new Date().toLocaleTimeString()}`,
+    `background:${color};color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold`,
+    `color:${color};font-weight:bold`,
+    `color:#888;font-size:10px`
+  );
+  if (data) console.log("%c Request:", "color:#aaa;font-weight:bold", data);
+  if (response && !isError) console.log("%c Response:", "color:#52c41a;font-weight:bold", response);
+  if (isError) console.log("%c Error:", "color:#ff4d4f;font-weight:bold", response);
+  console.groupEnd();
+};
+
 // Helper: Initialize localStorage DB if empty
 const initDB = () => {
   if (!localStorage.getItem(STORAGE_KEYS.DOCTORS)) {
@@ -47,14 +63,19 @@ export const api = {
   async login(credentials) {
     await delay(400);
     const { identifier, password } = credentials;
+    logAPI("POST", "/auth/login", { identifier, password: "***" });
 
     // Check credentials (accept demo or valid format)
     if (!identifier || !password) {
-      throw new Error("400 Bad Request: Patient ID/Email and password are required.");
+      const err = "400 Bad Request: Patient ID/Email and password are required.";
+      logAPI("POST", "/auth/login", null, err, true);
+      throw new Error(err);
     }
 
     if (password.length < 6) {
-      throw new Error("400 Bad Request: Password must be at least 6 characters.");
+      const err = "400 Bad Request: Password must be at least 6 characters.";
+      logAPI("POST", "/auth/login", null, err, true);
+      throw new Error(err);
     }
 
     // Generate mock JWT-like token
@@ -68,27 +89,33 @@ export const api = {
     localStorage.setItem(STORAGE_KEYS.TOKEN, token);
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
 
-    return {
-      status: 200,
-      token,
-      user,
-      message: "Login successful"
-    };
+    const result = { status: 200, token, user, message: "Login successful" };
+    logAPI("POST", "/auth/login", null, result);
+    return result;
   },
 
   async logout() {
     await delay(200);
+    logAPI("DELETE", "/auth/logout");
     localStorage.removeItem(STORAGE_KEYS.TOKEN);
     localStorage.removeItem(STORAGE_KEYS.USER);
-    return { status: 200, message: "Logged out successfully" };
+    const result = { status: 200, message: "Logged out successfully" };
+    logAPI("DELETE", "/auth/logout", null, result);
+    return result;
   },
 
   async getCurrentUser() {
     await delay(150);
+    logAPI("GET", "/auth/me");
     const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
-    if (!token) return null;
+    if (!token) {
+      logAPI("GET", "/auth/me", null, "No token found — unauthenticated", true);
+      return null;
+    }
     const userStr = localStorage.getItem(STORAGE_KEYS.USER);
-    return userStr ? JSON.parse(userStr) : null;
+    const user = userStr ? JSON.parse(userStr) : null;
+    logAPI("GET", "/auth/me", null, user);
+    return user;
   },
 
   // ==========================================
@@ -96,6 +123,7 @@ export const api = {
   // ==========================================
   async getDoctors(filters = {}) {
     await delay(300);
+    logAPI("GET", "/doctors", filters);
     const stored = localStorage.getItem(STORAGE_KEYS.DOCTORS);
     let list = stored ? JSON.parse(stored) : INITIAL_DOCTORS;
 
@@ -130,17 +158,21 @@ export const api = {
       list = list.filter((doc) => doc.availableDays.includes(filters.availableDay));
     }
 
+    logAPI("GET", "/doctors", null, `${list.length} doctors returned`);
     return list;
   },
 
   async getDoctorById(id) {
     await delay(250);
+    logAPI("GET", `/doctors/${id}`);
     const stored = localStorage.getItem(STORAGE_KEYS.DOCTORS);
     const list = stored ? JSON.parse(stored) : INITIAL_DOCTORS;
     const doctor = list.find((doc) => String(doc.id) === String(id));
     if (!doctor) {
+      logAPI("GET", `/doctors/${id}`, null, `Doctor ${id} not found`, true);
       throw new Error(`404 Not Found: Doctor with ID ${id} not found.`);
     }
+    logAPI("GET", `/doctors/${id}`, null, doctor);
     return doctor;
   },
 
@@ -171,10 +203,13 @@ export const api = {
   // ==========================================
   async getAppointments(authToken) {
     await delay(300);
+    logAPI("GET", "/appointments");
     // Protected API
     verifyAuth(authToken);
     const stored = localStorage.getItem(STORAGE_KEYS.APPOINTMENTS);
-    return stored ? JSON.parse(stored) : INITIAL_APPOINTMENTS;
+    const list = stored ? JSON.parse(stored) : INITIAL_APPOINTMENTS;
+    logAPI("GET", "/appointments", null, `${list.length} appointments returned`);
+    return list;
   },
 
   async getAppointmentById(id, authToken) {
@@ -190,6 +225,7 @@ export const api = {
 
   async createAppointment(appointmentData, authToken) {
     await delay(450);
+    logAPI("POST", "/appointments", appointmentData);
     verifyAuth(authToken);
 
     if (!appointmentData.doctorId) throw new Error("Doctor is required");
@@ -209,11 +245,13 @@ export const api = {
 
     const updated = [newAppointment, ...appointments];
     localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(updated));
+    logAPI("POST", "/appointments", null, newAppointment);
     return newAppointment;
   },
 
   async rescheduleAppointment(id, { appointmentDate, timeSlot }, authToken) {
     await delay(350);
+    logAPI("PUT", `/appointments/${id}/reschedule`, { appointmentDate, timeSlot });
     verifyAuth(authToken);
 
     if (!appointmentDate || !timeSlot) {
@@ -241,6 +279,7 @@ export const api = {
 
   async cancelAppointment(id, authToken) {
     await delay(300);
+    logAPI("DELETE", `/appointments/${id}/cancel`);
     verifyAuth(authToken);
 
     const appointments = await this.getAppointments(authToken);
