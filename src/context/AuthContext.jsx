@@ -49,9 +49,16 @@ export const AuthProvider = ({ children }) => {
       const res = await api.login({ identifier, password });
       setToken(res.token);
       setUser(res.user);
+      localStorage.setItem("medicare_auth_token", res.token);
+      localStorage.setItem("medicare_auth_user", JSON.stringify(res.user));
+      console.log(
+        "%c 🔑 [AuthContext] REST API Session Stored: Bearer Token Saved to localStorage",
+        "color: #16a34a; font-weight: bold; font-size: 11px;"
+      );
       return { success: true, user: res.user };
     } catch (err) {
       setAuthError(err.message || "Failed to log in");
+      console.error("❌ [AuthContext] Login Failed:", err.message);
       return { success: false, error: err.message };
     } finally {
       setIsLoading(false);
@@ -65,6 +72,12 @@ export const AuthProvider = ({ children }) => {
       await api.logout();
       setToken(null);
       setUser(null);
+      localStorage.removeItem("medicare_auth_token");
+      localStorage.removeItem("medicare_auth_user");
+      console.log(
+        "%c 🚪 [AuthContext] REST API Session Cleared: Patient Logged Out",
+        "color: #dc2626; font-weight: bold; font-size: 11px;"
+      );
     } catch (err) {
       console.error("Logout error:", err);
     } finally {

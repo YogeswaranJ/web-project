@@ -16,17 +16,62 @@ const delay = (ms = 350) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Helper: Styled console logger for API activity
 const logAPI = (method, endpoint, data = null, response = null, isError = false) => {
-  const color = isError ? "#ff4d4f" : method === "GET" ? "#52c41a" : method === "POST" ? "#1890ff" : method === "PUT" ? "#fa8c16" : "#f5222d";
-  const icon = isError ? "❌" : method === "GET" ? "📥" : method === "POST" ? "📤" : method === "PUT" ? "🔄" : "🗑️";
+  const isRequest = data !== null && response === null && !isError;
+  const isSuccess = response !== null && !isError;
+
+  if (isRequest) {
+    const color = method === "GET" ? "#0284c7" : method === "POST" ? "#2563eb" : method === "PUT" ? "#d97706" : "#dc2626";
+    console.groupCollapsed(
+      `%c 🚀 REST API REQUEST: ${method} %c ${endpoint} %c ${new Date().toLocaleTimeString()}`,
+      `background:${color};color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold;font-size:11px`,
+      `color:${color};font-weight:bold;font-size:11px`,
+      `color:#888;font-size:10px`
+    );
+    if (data) console.log("%c 📤 Request Payload:", "color:#4b5563;font-weight:bold", data);
+    console.groupEnd();
+    return;
+  }
+
+  if (isSuccess) {
+    const statusText = method === "POST" && endpoint === "/appointments" ? "201 Created" : "200 OK";
+    // Direct uncollapsed console log so it is immediately visible in the console list
+    console.log(
+      `%c ✅ REST API SUCCESSFUL %c [${statusText}] ${method} ${endpoint} %c ${new Date().toLocaleTimeString()}`,
+      `background:#16a34a;color:#ffffff;font-weight:bold;padding:3px 8px;border-radius:4px;font-size:11px;`,
+      `color:#16a34a;font-weight:bold;font-size:11px;`,
+      `color:#6b7280;font-size:10px;`
+    );
+    console.groupCollapsed(
+      `%c 📦 REST API Response Details: ${method} ${endpoint} [${statusText}]`,
+      `color:#15803d;font-weight:600;font-size:11px;`
+    );
+    console.log(`%c Status: %c ${statusText} — REST API Call Succeeded`, "font-weight:bold;color:#374151;", "color:#16a34a;font-weight:bold;");
+    console.log("%c Response Data:", "color:#16a34a;font-weight:bold", response);
+    console.groupEnd();
+    return;
+  }
+
+  if (isError) {
+    console.log(
+      `%c ❌ REST API ERROR %c ${method} ${endpoint} %c ${new Date().toLocaleTimeString()}`,
+      `background:#dc2626;color:#ffffff;font-weight:bold;padding:3px 8px;border-radius:4px;font-size:11px;`,
+      `color:#dc2626;font-weight:bold;font-size:11px;`,
+      `color:#6b7280;font-size:10px;`
+    );
+    console.groupCollapsed(`%c ⚠️ REST API Error Details: ${method} ${endpoint}`, `color:#dc2626;font-size:11px;`);
+    console.log("%c Error Message:", "color:#dc2626;font-weight:bold", response);
+    console.groupEnd();
+    return;
+  }
+
+  // Fallback for initial calls
+  const color = "#0284c7";
   console.groupCollapsed(
-    `%c ${icon} ${method} %c ${endpoint} %c ${new Date().toLocaleTimeString()}`,
+    `%c 📥 REST API: ${method} %c ${endpoint} %c ${new Date().toLocaleTimeString()}`,
     `background:${color};color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold`,
     `color:${color};font-weight:bold`,
     `color:#888;font-size:10px`
   );
-  if (data) console.log("%c Request:", "color:#aaa;font-weight:bold", data);
-  if (response && !isError) console.log("%c Response:", "color:#52c41a;font-weight:bold", response);
-  if (isError) console.log("%c Error:", "color:#ff4d4f;font-weight:bold", response);
   console.groupEnd();
 };
 
@@ -91,6 +136,11 @@ export const api = {
 
     const result = { status: 200, token, user, message: "Login successful" };
     logAPI("POST", "/auth/login", null, result);
+    console.log(
+      `%c 🌟 [REST API AUTHENTICATION SUCCESSFUL] %c Patient Login Verified (200 OK) | Bearer Token Generated: ${token.substring(0, 18)}...`,
+      "background: #059669; color: #fff; font-weight: bold; padding: 4px 10px; border-radius: 4px; font-size: 12px;",
+      "color: #059669; font-weight: bold; font-size: 11px;"
+    );
     return result;
   },
 
@@ -158,7 +208,7 @@ export const api = {
       list = list.filter((doc) => doc.availableDays.includes(filters.availableDay));
     }
 
-    logAPI("GET", "/doctors", null, `${list.length} doctors returned`);
+    logAPI("GET", "/doctors", null, { count: list.length, doctors: list });
     return list;
   },
 
@@ -208,7 +258,7 @@ export const api = {
     verifyAuth(authToken);
     const stored = localStorage.getItem(STORAGE_KEYS.APPOINTMENTS);
     const list = stored ? JSON.parse(stored) : INITIAL_APPOINTMENTS;
-    logAPI("GET", "/appointments", null, `${list.length} appointments returned`);
+    logAPI("GET", "/appointments", null, { count: list.length, appointments: list });
     return list;
   },
 
@@ -220,6 +270,7 @@ export const api = {
     if (!item) {
       throw new Error(`404 Not Found: Appointment ${id} not found.`);
     }
+    logAPI("GET", `/appointments/${id}`, null, item);
     return item;
   },
 
@@ -274,12 +325,13 @@ export const api = {
 
     appointments[index] = updatedAppointment;
     localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(appointments));
+    logAPI("PUT", `/appointments/${id}/reschedule`, null, updatedAppointment);
     return updatedAppointment;
   },
 
   async cancelAppointment(id, authToken) {
     await delay(300);
-    logAPI("DELETE", `/appointments/${id}/cancel`);
+    logAPI("DELETE", `/appointments/${id}/cancel`, { id });
     verifyAuth(authToken);
 
     const appointments = await this.getAppointments(authToken);
@@ -296,16 +348,20 @@ export const api = {
 
     appointments[index] = cancelledAppointment;
     localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(appointments));
+    logAPI("DELETE", `/appointments/${id}/cancel`, null, cancelledAppointment);
     return cancelledAppointment;
   },
 
   async deleteAppointmentPermanently(id, authToken) {
     await delay(300);
+    logAPI("DELETE", `/appointments/${id}`, { id });
     verifyAuth(authToken);
 
     const appointments = await this.getAppointments(authToken);
     const filtered = appointments.filter((apt) => String(apt.id) !== String(id));
     localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(filtered));
-    return { success: true, message: `Appointment ${id} deleted successfully.` };
+    const deleteResult = { success: true, message: `Appointment ${id} deleted successfully.` };
+    logAPI("DELETE", `/appointments/${id}`, null, deleteResult);
+    return deleteResult;
   }
 };

@@ -2994,6 +2994,12 @@ button, input, select, textarea {
   color: var(--danger);
 }
 
+.login-alert-banner.success {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+
 .login-meta-row {
   display: flex;
   align-items: center;

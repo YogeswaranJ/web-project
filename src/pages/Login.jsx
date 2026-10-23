@@ -31,6 +31,7 @@ export const Login = () => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [loginSuccess, setLoginSuccess] = useState(false);
 
   // Validation function (Experiment 4f)
   const validateForm = () => {
@@ -73,8 +74,15 @@ export const Login = () => {
     setIsSubmitting(false);
 
     if (result.success) {
-      // Experiment 4e: After successful login, redirect the patient to the requested protected page
-      navigate(redirectPath, { replace: true });
+      console.log(
+        "%c ✅ [REST API 200 OK] Patient Login Successful — Token Issued & Redirecting to Dashboard",
+        "background: #16a34a; color: #ffffff; font-weight: bold; font-size: 13px; padding: 5px 12px; border-radius: 5px;"
+      );
+      // Experiment 4e: Show REST API success message, then redirect
+      setLoginSuccess(true);
+      setTimeout(() => {
+        navigate(redirectPath, { replace: true });
+      }, 1800);
     } else {
       setServerError(result.error || "Authentication failed. Please verify your credentials.");
     }
@@ -129,6 +137,15 @@ export const Login = () => {
               </button>
             </div>
           </div>
+
+          {loginSuccess && (
+            <div className="login-alert-banner success" role="alert">
+              <CheckCircle2 size={16} />
+              <span>
+                ✅ REST API: <strong>POST /auth/login → 200 OK</strong> — Login successful! Redirecting to your dashboard…
+              </span>
+            </div>
+          )}
 
           {serverError && (
             <div className="login-alert-banner danger" role="alert">
